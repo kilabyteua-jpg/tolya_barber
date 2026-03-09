@@ -1,0 +1,633 @@
+<!doctype html>
+<html lang="uk" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BarberShop Booking Pro</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="/_sdk/element_sdk.js"></script>
+  <script src="/_sdk/data_sdk.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&amp;family=Montserrat:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+  <style>
+    .font-display { font-family: 'Bebas Neue', sans-serif; }
+    .font-body { font-family: 'Montserrat', sans-serif; }
+    .gradient-gold { background: linear-gradient(135deg, #D4A574 0%, #C4956A 50%, #B8895E 100%); }
+    .card-shadow { box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+    .btn-press:active { transform: scale(0.97); }
+    .slide-in { animation: slideIn 0.3s ease-out; }
+    @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .fade-in { animation: fadeIn 0.4s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: #D4A574; box-shadow: 0 0 0 3px rgba(212, 165, 116, 0.2); }
+    .time-slot { transition: all 0.2s ease; }
+    .time-slot:hover:not(.booked):not(.selected) { background: rgba(212, 165, 116, 0.2); border-color: #D4A574; }
+    .time-slot.selected { background: #D4A574; color: #1a1a1a; border-color: #D4A574; }
+    .time-slot.booked { opacity: 0.4; cursor: not-allowed; text-decoration: line-through; }
+    .status-badge { font-size: 0.7rem; padding: 2px 8px; border-radius: 9999px; }
+    .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); padding: 12px 24px; border-radius: 8px; z-index: 1000; animation: toastIn 0.3s ease-out; }
+    @keyframes toastIn { from { opacity: 0; transform: translate(-50%, 20px); } to { opacity: 1; transform: translate(-50%, 0); } }
+    .nav-btn { transition: all 0.2s ease; }
+    .nav-btn.active { background: #D4A574; color: #1a1a1a; }
+    .nav-btn:not(.active):hover { background: rgba(212, 165, 116, 0.2); }
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 999; align-items: center; justify-content: center; padding: 1rem; }
+    .modal-overlay.active { display: flex; }
+    body { box-sizing: border-box; }
+  </style>
+ </head>
+ <body class="h-full bg-neutral-950 font-body text-neutral-100 overflow-auto">
+  <div id="app" class="min-h-full w-full flex flex-col">
+   <header class="bg-neutral-900 border-b border-neutral-800 p-4 sticky top-0 z-40">
+    <div class="max-w-lg mx-auto flex items-center justify-between">
+     <div class="flex items-center gap-3 flex-1">
+      <div class="w-10 h-10 gradient-gold rounded-lg flex items-center justify-center flex-shrink-0 font-display font-bold text-neutral-900 text-lg tracking-wide">
+       АР
+      </div>
+      <div class="min-w-0">
+       <h1 id="header-title" class="font-display text-xl md:text-2xl tracking-wider text-amber-100 truncate">CLASSIC BARBER</h1>
+       <p id="header-address" class="text-xs text-neutral-500 truncate">вул. Хрещатик, 10</p>
+      </div>
+     </div>
+     <div class="text-right flex-shrink-0">
+      <p id="user-display" class="text-xs text-neutral-400 mb-1">👤 Завантаження...</p><span id="role-indicator" class="px-3 py-1.5 text-xs rounded-full border border-neutral-700 inline-block">Клієнт</span>
+     </div>
+    </div>
+   </header>
+   <main class="flex-1 p-4 pb-24">
+    <div class="max-w-lg mx-auto">
+     <div id="client-view" class="space-y-4">
+      <nav class="flex gap-2 p-1 bg-neutral-900 rounded-xl"><button class="nav-btn active flex-1 py-2.5 px-4 rounded-lg text-sm font-medium" data-tab="booking">✂️ Запис</button><button class="nav-btn flex-1 py-2.5 px-4 rounded-lg text-sm font-medium" data-tab="my-bookings">📅 Мої</button>
+      </nav>
+      <div id="booking-tab" class="slide-in space-y-4">
+       <div class="bg-neutral-900 rounded-2xl p-5 card-shadow">
+        <h2 class="font-display text-xl tracking-wide mb-4 text-amber-100">ЗАПИСАТИСЬ</h2>
+        <form id="booking-form" class="space-y-4">
+         <div><label class="block text-sm text-neutral-400 mb-1.5">Ваше ім'я</label><input type="text" id="client-name" required class="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-4 py-3 text-neutral-100" placeholder="Ім'я">
+         </div>
+         <div><label class="block text-sm text-neutral-400 mb-1.5">Телефон</label><input type="tel" id="client-phone" required class="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-4 py-3 text-neutral-100" placeholder="+380">
+         </div>
+         <div><label class="block text-sm text-neutral-400 mb-1.5">Послуга</label><select id="service" required class="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-4 py-3 text-neutral-100"><option value="">Оберіть</option></select>
+         </div>
+         <div><label class="block text-sm text-neutral-400 mb-1.5">Дата</label><input type="date" id="booking-date" required class="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-4 py-3 text-neutral-100">
+         </div>
+         <div><label class="block text-sm text-neutral-400 mb-2">Час</label>
+          <div id="time-slots" class="grid grid-cols-4 gap-2"></div><input type="hidden" id="selected-time">
+         </div>
+         <div><label class="block text-sm text-neutral-400 mb-1.5">Коментар</label><textarea id="notes" rows="2" class="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-4 py-3 text-neutral-100 resize-none" placeholder="..."></textarea>
+         </div><button type="submit" id="submit-btn" class="w-full gradient-gold text-neutral-900 font-semibold py-3.5 rounded-lg btn-press hover:opacity-90 disabled:opacity-50">Записатись</button>
+        </form>
+       </div>
+      </div>
+      <div id="my-bookings-tab" class="hidden slide-in">
+       <div class="bg-neutral-900 rounded-2xl p-5 card-shadow">
+        <h2 class="font-display text-xl tracking-wide mb-4 text-amber-100">МОЇ ЗАПИСИ</h2>
+        <div id="client-bookings-list" class="space-y-3">
+         <p class="text-neutral-500 text-center py-8">Завантаження...</p>
+        </div>
+       </div>
+      </div>
+     </div>
+     <div id="barber-view" class="hidden space-y-4">
+      <nav class="flex gap-2 p-1 bg-neutral-900 rounded-xl overflow-x-auto"><button class="nav-btn active flex-1 py-2.5 px-2 rounded-lg text-xs font-medium whitespace-nowrap" data-tab="today">📋 Сьогодні</button><button class="nav-btn flex-1 py-2.5 px-2 rounded-lg text-xs font-medium whitespace-nowrap" data-tab="all">📊 Всі</button><button class="nav-btn flex-1 py-2.5 px-2 rounded-lg text-xs font-medium whitespace-nowrap" data-tab="clients">👥 Клієнти</button><button class="nav-btn flex-1 py-2.5 px-2 rounded-lg text-xs font-medium whitespace-nowrap" data-tab="settings">⚙️ Налаш.</button>
+      </nav>
+      <div id="today-tab" class="slide-in">
+       <div class="bg-neutral-900 rounded-2xl p-5 card-shadow">
+        <div class="flex items-center justify-between mb-4">
+         <h2 class="font-display text-xl tracking-wide text-amber-100">СЬОГОДНІ</h2><span id="today-date" class="text-sm text-neutral-500"></span>
+        </div>
+        <div id="today-bookings" class="space-y-3">
+         <p class="text-neutral-500 text-center py-8">Завантаження...</p>
+        </div>
+       </div>
+      </div>
+      <div id="all-tab" class="hidden slide-in">
+       <div class="bg-neutral-900 rounded-2xl p-5 card-shadow">
+        <div class="flex items-center justify-between mb-4">
+         <h2 class="font-display text-lg tracking-wide text-amber-100">ЗАПИСИ</h2><select id="filter-status" class="bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-1.5 text-xs"><option value="all">Всі</option><option value="confirmed">Підтв.</option><option value="completed">Виконані</option><option value="cancelled">Скасовані</option></select>
+        </div>
+        <div id="all-bookings" class="space-y-3 max-h-96 overflow-y-auto">
+         <p class="text-neutral-500 text-center py-8">Завантаження...</p>
+        </div>
+       </div>
+      </div>
+      <div id="clients-tab" class="hidden slide-in">
+       <div class="bg-neutral-900 rounded-2xl p-5 card-shadow">
+        <h2 class="font-display text-lg tracking-wide mb-4 text-amber-100">КЛІЄНТИ</h2>
+        <div id="clients-list" class="space-y-3 max-h-96 overflow-y-auto">
+         <p class="text-neutral-500 text-center py-8">Завантаження...</p>
+        </div>
+       </div>
+      </div>
+      <div id="settings-tab" class="hidden slide-in space-y-4">
+       <div class="bg-neutral-900 rounded-2xl p-5 card-shadow">
+        <h2 class="font-display text-lg tracking-wide mb-4 text-amber-100">ПОСЛУГИ</h2>
+        <div id="services-list" class="space-y-3 mb-4">
+         <p class="text-neutral-500 text-center py-4">Завантаження...</p>
+        </div><button id="add-service-btn" class="w-full gradient-gold text-neutral-900 font-semibold py-2.5 rounded-lg btn-press">+ Послуга</button>
+       </div>
+       <div class="bg-neutral-900 rounded-2xl p-5 card-shadow">
+        <h2 class="font-display text-lg tracking-wide mb-4 text-amber-100">БЛОКУВАННЯ</h2>
+        <div class="space-y-3">
+         <div><label class="block text-sm text-neutral-400 mb-1.5">Дата</label><input type="date" id="block-date" class="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-4 py-3 text-neutral-100">
+         </div>
+         <div><label class="block text-sm text-neutral-400 mb-1.5">Час (опціонально)</label><input type="time" id="block-time" class="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-4 py-3 text-neutral-100">
+         </div>
+         <div><label class="block text-sm text-neutral-400 mb-1.5">Причина</label><input type="text" id="block-reason" class="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-4 py-3 text-neutral-100" placeholder="Обід, Хвороба...">
+         </div><button id="add-block-btn" class="w-full gradient-gold text-neutral-900 font-semibold py-2.5 rounded-lg btn-press">🔒 Заблокувати</button>
+        </div>
+        <div id="blocks-display" class="mt-4 pt-4 border-t border-neutral-700 text-sm text-neutral-400">
+         Немає
+        </div>
+       </div>
+      </div>
+     </div>
+    </div>
+   </main>
+   <div id="toast-container"></div>
+   <div id="service-modal" class="modal-overlay">
+    <div class="bg-neutral-900 rounded-2xl p-6 max-w-sm w-full card-shadow fade-in">
+     <h3 class="font-display text-xl text-amber-100 mb-4">НОВА ПОСЛУГА</h3>
+     <div class="space-y-3">
+      <div><label class="block text-sm text-neutral-400 mb-1.5">Назва</label><input type="text" id="service-name-input" class="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-4 py-2 text-neutral-100" placeholder="Стрижка">
+      </div>
+      <div><label class="block text-sm text-neutral-400 mb-1.5">Ціна (₴)</label><input type="number" id="service-price-input" class="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-4 py-2 text-neutral-100" placeholder="350" min="0">
+      </div>
+      <div><label class="block text-sm text-neutral-400 mb-1.5">Тривалість (хв)</label><input type="number" id="service-duration-input" class="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-4 py-2 text-neutral-100" placeholder="30" min="15" step="15">
+      </div>
+      <div class="flex gap-3"><button type="button" id="service-cancel-btn" class="flex-1 py-2.5 border border-neutral-700 rounded-lg font-medium hover:bg-neutral-800">Скасувати</button><button type="button" id="service-save-btn" class="flex-1 py-2.5 gradient-gold text-neutral-900 rounded-lg font-semibold btn-press">Зберегти</button>
+      </div>
+     </div>
+    </div>
+   </div>
+  </div>
+  <script>
+    // Telegram WebApp
+    const tg = window.Telegram?.WebApp;
+    if (tg) { tg.ready(); tg.expand(); }
+
+    const defaultConfig = { shop_name: 'Анатолій Ран', shop_address: 'Вільний художник', primary_color: '#D4A574', background_color: '#0a0a0a', surface_color: '#171717', text_color: '#f5f5f5', accent_color: '#fef3c7', admin_telegram_ids: '' };
+    let allBookings = [], allServices = [], allBlocks = [], currentUser = null, currentRole = 'client';
+    const timeSlots = ['09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '12:00', '12:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00', '17:30', '18:00', '18:30', '19:00', '19:30'];
+
+    function getCurrentUser() {
+      if (!tg) return null;
+      const initData = tg.initDataUnsafe;
+      if (!initData || !initData.user) return null;
+      return { id: initData.user.id?.toString() || 'guest', firstName: initData.user.first_name || 'Guest', lastName: initData.user.last_name || '', username: initData.user.username || '', photoUrl: initData.user.photo_url || '' };
+    }
+
+    function isUserAdmin(userId) {
+      const adminIds = (window.elementSdk?.config?.admin_telegram_ids || defaultConfig.admin_telegram_ids).split(',').map(id => id.trim()).filter(Boolean);
+      return adminIds.includes(userId);
+    }
+
+    const elementHandler = {
+      defaultConfig,
+      onConfigChange: async (config) => {
+        document.getElementById('header-title').textContent = config.shop_name || defaultConfig.shop_name;
+        document.getElementById('header-address').textContent = config.shop_address || defaultConfig.shop_address;
+      },
+      mapToCapabilities: (config) => ({
+        recolorables: [
+          { get: () => config.background_color || defaultConfig.background_color, set: (v) => window.elementSdk.setConfig({ background_color: v }) },
+          { get: () => config.surface_color || defaultConfig.surface_color, set: (v) => window.elementSdk.setConfig({ surface_color: v }) },
+          { get: () => config.text_color || defaultConfig.text_color, set: (v) => window.elementSdk.setConfig({ text_color: v }) },
+          { get: () => config.primary_color || defaultConfig.primary_color, set: (v) => window.elementSdk.setConfig({ primary_color: v }) },
+          { get: () => config.accent_color || defaultConfig.accent_color, set: (v) => window.elementSdk.setConfig({ accent_color: v }) }
+        ],
+        borderables: [],
+        fontEditable: undefined,
+        fontSizeable: undefined
+      }),
+      mapToEditPanelValues: (config) => new Map([
+        ['shop_name', config.shop_name || defaultConfig.shop_name],
+        ['shop_address', config.shop_address || defaultConfig.shop_address],
+        ['admin_telegram_ids', config.admin_telegram_ids || defaultConfig.admin_telegram_ids]
+      ])
+    };
+
+    const dataHandler = {
+      onDataChanged: (data) => {
+        allBookings = data.filter(item => item.type === 'booking');
+        allServices = data.filter(item => item.type === 'service');
+        allBlocks = data.filter(item => item.type === 'block');
+        renderCurrentView();
+      }
+    };
+
+    function haptic(type = 'light') {
+      if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred(type);
+    }
+
+    function showToast(message, type = 'success') {
+      haptic(type === 'success' ? 'light' : 'medium');
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = `toast ${type === 'success' ? 'bg-green-600' : type === 'error' ? 'bg-red-600' : 'bg-amber-600'} text-white font-medium`;
+      toast.textContent = message;
+      container.appendChild(toast);
+      setTimeout(() => toast.remove(), 3000);
+    }
+
+    async function confirmAction(message) {
+      if (tg?.showConfirm) return new Promise((resolve) => { tg.showConfirm(message, (result) => resolve(result)); });
+      return confirm(message);
+    }
+
+    function formatDate(dateStr) {
+      const date = new Date(dateStr + 'T00:00:00');
+      return date.toLocaleDateString('uk-UA', { day: 'numeric', month: 'long', year: 'numeric' });
+    }
+
+    function getTodayStr() { return new Date().toISOString().split('T')[0]; }
+
+    function isTimeSlotBlocked(date, time) {
+      return allBlocks.some(block => { if (block.date !== date) return false; if (!block.time) return true; return block.time === time; });
+    }
+
+    function generateTimeSlots(selectedDate) {
+      const container = document.getElementById('time-slots');
+      const bookedTimes = allBookings.filter(b => b.date === selectedDate && b.status !== 'cancelled').map(b => b.time);
+      container.innerHTML = timeSlots.map(time => {
+        const isBooked = bookedTimes.includes(time), isBlocked = isTimeSlotBlocked(selectedDate, time), disabled = isBooked || isBlocked;
+        return `<button type="button" class="time-slot py-2 text-sm border border-neutral-700 rounded-lg transition-all ${disabled ? 'booked' : ''}" data-time="${time}" ${disabled ? 'disabled' : ''}>${time}</button>`;
+      }).join('');
+      container.querySelectorAll('.time-slot:not(.booked)').forEach(btn => {
+        btn.addEventListener('click', () => {
+          haptic('light');
+          container.querySelectorAll('.time-slot').forEach(b => b.classList.remove('selected'));
+          btn.classList.add('selected');
+          document.getElementById('selected-time').value = btn.dataset.time;
+        });
+      });
+    }
+
+    function renderServicesDropdown() {
+      const select = document.getElementById('service');
+      const selectedValue = select.value;
+      select.innerHTML = '<option value="">Оберіть послугу</option>';
+      const activeServices = allServices.filter(s => s.serviceActive !== false);
+      activeServices.forEach(service => {
+        select.innerHTML += `<option value="${service.__backendId}">${service.serviceName} — ${service.servicePrice}₴</option>`;
+      });
+      select.value = selectedValue;
+    }
+
+    function renderServicesList() {
+      const container = document.getElementById('services-list');
+      const activeServices = allServices.filter(s => s.serviceActive !== false);
+      if (activeServices.length === 0) {
+        container.innerHTML = '<p class="text-neutral-500 text-center py-4">Послуг ще немає</p>';
+        return;
+      }
+      container.innerHTML = activeServices.map(service => `
+        <div class="bg-neutral-800 rounded-lg p-3 flex justify-between items-start">
+          <div><p class="font-medium">${service.serviceName}</p><p class="text-xs text-neutral-400">${service.servicePrice}₴ • ${service.serviceDuration} хв</p></div>
+          <button class="delete-service text-red-400 hover:text-red-300 text-sm" data-id="${service.__backendId}">🗑️</button>
+        </div>
+      `).join('');
+      container.querySelectorAll('.delete-service').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const confirmed = await confirmAction('Видалити цю послугу?');
+          if (confirmed) {
+            const service = allServices.find(s => s.__backendId === btn.dataset.id);
+            if (service) {
+              const result = await window.dataSdk.delete(service);
+              if (result.isOk) showToast('Послугу видалено');
+              else showToast('Помилка видалення', 'error');
+            }
+          }
+        });
+      });
+    }
+
+    function renderBlocksList() {
+      const container = document.getElementById('blocks-display');
+      if (allBlocks.length === 0) {
+        container.innerHTML = 'Немає блокувань';
+        return;
+      }
+      container.innerHTML = allBlocks.map((block, idx) => `
+        <div class="flex justify-between items-center py-2 border-t border-neutral-700 text-xs">
+          <span>${formatDate(block.date)} ${block.time || '(весь день)'} - ${block.blockReason}</span>
+          <button class="delete-block text-red-400 hover:text-red-300" data-id="${block.__backendId}">🗑️</button>
+        </div>
+      `).join('');
+      container.querySelectorAll('.delete-block').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const block = allBlocks.find(b => b.__backendId === btn.dataset.id);
+          if (block) {
+            const result = await window.dataSdk.delete(block);
+            if (result.isOk) showToast('Блокування видалено');
+            else showToast('Помилка видалення', 'error');
+          }
+        });
+      });
+    }
+
+    function renderClientBookings() {
+      const container = document.getElementById('client-bookings-list');
+      const clientName = document.getElementById('client-name').value.trim().toLowerCase();
+      if (!clientName && !currentUser) {
+        container.innerHTML = '<p class="text-neutral-500 text-center py-8">Введіть ім\'я</p>';
+        return;
+      }
+      let myBookings = [];
+      if (currentUser) myBookings = allBookings.filter(b => b.clientTelegramId === currentUser.id);
+      else if (clientName) myBookings = allBookings.filter(b => b.clientName.toLowerCase().includes(clientName));
+      myBookings.sort((a, b) => new Date(b.date) - new Date(a.date));
+      if (myBookings.length === 0) {
+        container.innerHTML = '<p class="text-neutral-500 text-center py-8">Немає записів</p>';
+        return;
+      }
+      container.innerHTML = myBookings.map(booking => {
+        const service = allServices.find(s => s.__backendId === booking.service);
+        return `
+          <div class="bg-neutral-800 rounded-xl p-4 slide-in">
+            <div class="flex justify-between items-start mb-2"><div><span class="font-semibold">${service?.serviceName || 'Послуга'}</span><span class="status-badge ml-2 ${booking.status === 'confirmed' ? 'bg-green-600/20 text-green-400' : booking.status === 'completed' ? 'bg-blue-600/20 text-blue-400' : 'bg-red-600/20 text-red-400'}">${booking.status === 'confirmed' ? 'Підтверджено' : booking.status === 'completed' ? 'Виконано' : 'Скасовано'}</span></div><span class="text-amber-200 font-semibold">${service?.servicePrice || 0}₴</span></div>
+            <p class="text-sm text-neutral-400">📅 ${formatDate(booking.date)} о ${booking.time}</p>
+            ${booking.notes ? `<p class="text-sm text-neutral-500 mt-1">💬 ${booking.notes}</p>` : ''}
+            ${booking.status === 'confirmed' ? `<button class="cancel-booking mt-3 w-full py-2 text-sm border border-red-500/30 text-red-400 rounded-lg hover:bg-red-500/10" data-id="${booking.__backendId}">❌ Скасувати</button>` : ''}
+          </div>
+        `;
+      }).join('');
+      container.querySelectorAll('.cancel-booking').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const confirmed = await confirmAction('Скасувати запис?');
+          if (confirmed) {
+            const booking = allBookings.find(b => b.__backendId === btn.dataset.id);
+            if (booking) {
+              btn.disabled = true;
+              btn.textContent = '⏳ Скасування...';
+              const result = await window.dataSdk.update({ ...booking, status: 'cancelled' });
+              if (result.isOk) showToast('Запис скасовано');
+              else { showToast('Помилка', 'error'); btn.disabled = false; btn.textContent = '❌ Скасувати'; }
+            }
+          }
+        });
+      });
+    }
+
+    function renderTodayBookings() {
+      const container = document.getElementById('today-bookings');
+      const today = getTodayStr();
+      document.getElementById('today-date').textContent = formatDate(today);
+      const todayBookings = allBookings.filter(b => b.date === today && b.status !== 'cancelled').sort((a, b) => a.time.localeCompare(b.time));
+      if (todayBookings.length === 0) {
+        container.innerHTML = '<p class="text-neutral-500 text-center py-8">На сьогодні записів немає 🎉</p>';
+        return;
+      }
+      container.innerHTML = todayBookings.map(booking => {
+        const service = allServices.find(s => s.__backendId === booking.service);
+        return `
+          <div class="bg-neutral-800 rounded-xl p-4 slide-in">
+            <div class="flex justify-between items-start"><div><span class="text-lg font-semibold text-amber-200">${booking.time}</span><span class="status-badge ml-2 ${booking.status === 'confirmed' ? 'bg-green-600/20 text-green-400' : 'bg-blue-600/20 text-blue-400'}">${booking.status === 'confirmed' ? 'Очікує' : 'Виконано'}</span></div><span class="text-neutral-400 text-sm">${service?.servicePrice || 0}₴</span></div>
+            <p class="font-medium mt-1">👤 ${booking.clientName}</p>
+            <p class="text-sm text-neutral-400">📱 ${booking.clientPhone}</p>
+            <p class="text-sm text-neutral-400">✂️ ${service?.serviceName || 'Послуга'} (${service?.serviceDuration || 30} хв)</p>
+            ${booking.notes ? `<p class="text-sm text-neutral-500 mt-1">💬 ${booking.notes}</p>` : ''}
+            <div class="flex gap-2 mt-3">
+              ${booking.status === 'confirmed' ? `<button class="complete-booking flex-1 py-2 text-sm gradient-gold text-neutral-900 rounded-lg font-medium btn-press" data-id="${booking.__backendId}">✓ Виконано</button>` : ''}
+              <button class="cancel-booking-admin flex-1 py-2 text-sm border border-red-500/30 text-red-400 rounded-lg hover:bg-red-500/10" data-id="${booking.__backendId}">🗑️ Скасувати</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+      container.querySelectorAll('.complete-booking').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const booking = allBookings.find(b => b.__backendId === btn.dataset.id);
+          if (booking) {
+            btn.disabled = true;
+            const result = await window.dataSdk.update({ ...booking, status: 'completed' });
+            if (result.isOk) showToast('Візит завершено!');
+            else { showToast('Помилка', 'error'); btn.disabled = false; }
+          }
+        });
+      });
+      container.querySelectorAll('.cancel-booking-admin').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const confirmed = await confirmAction('Скасувати запис клієнта?');
+          if (confirmed) {
+            const booking = allBookings.find(b => b.__backendId === btn.dataset.id);
+            if (booking) {
+              btn.disabled = true;
+              const result = await window.dataSdk.update({ ...booking, status: 'cancelled' });
+              if (result.isOk) showToast('Запис скасовано');
+              else { showToast('Помилка', 'error'); btn.disabled = false; }
+            }
+          }
+        });
+      });
+    }
+
+    function renderAllBookings() {
+      const container = document.getElementById('all-bookings');
+      const filter = document.getElementById('filter-status').value;
+      let filtered = [...allBookings];
+      if (filter !== 'all') filtered = filtered.filter(b => b.status === filter);
+      filtered.sort((a, b) => new Date(b.date) - new Date(a.date) || b.time.localeCompare(a.time));
+      if (filtered.length === 0) {
+        container.innerHTML = '<p class="text-neutral-500 text-center py-8">Записів не знайдено</p>';
+        return;
+      }
+      container.innerHTML = filtered.map(booking => {
+        const service = allServices.find(s => s.__backendId === booking.service);
+        return `
+          <div class="bg-neutral-800 rounded-xl p-4 slide-in">
+            <div class="flex justify-between items-start mb-1"><span class="font-medium">${booking.clientName}</span><span class="status-badge ${booking.status === 'confirmed' ? 'bg-green-600/20 text-green-400' : booking.status === 'completed' ? 'bg-blue-600/20 text-blue-400' : 'bg-red-600/20 text-red-400'}">${booking.status === 'confirmed' ? 'Підтв.' : booking.status === 'completed' ? 'Виконано' : 'Скасовано'}</span></div>
+            <p class="text-sm text-neutral-400">📅 ${formatDate(booking.date)} о ${booking.time}</p>
+            <p class="text-sm text-neutral-400">✂️ ${service?.serviceName || 'Послуга'} — ${service?.servicePrice || 0}₴</p>
+            <p class="text-sm text-neutral-400">📱 ${booking.clientPhone}</p>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderClientsList() {
+      const container = document.getElementById('clients-list');
+      const clientsMap = new Map();
+      allBookings.forEach(b => {
+        const key = b.clientPhone;
+        if (!clientsMap.has(key)) clientsMap.set(key, { name: b.clientName, phone: b.clientPhone, visits: 0, total: 0 });
+        if (b.status === 'completed') {
+          clientsMap.get(key).visits++;
+          const service = allServices.find(s => s.__backendId === b.service);
+          clientsMap.get(key).total += service?.servicePrice || 0;
+        }
+      });
+      const clients = Array.from(clientsMap.values()).sort((a, b) => b.visits - a.visits);
+      if (clients.length === 0) {
+        container.innerHTML = '<p class="text-neutral-500 text-center py-8">Поки немає клієнтів</p>';
+        return;
+      }
+      container.innerHTML = clients.map(client => `
+        <div class="bg-neutral-800 rounded-xl p-4 slide-in">
+          <div class="flex justify-between items-start"><div><p class="font-medium">👤 ${client.name}</p><p class="text-sm text-neutral-400">📱 ${client.phone}</p></div><div class="text-right"><p class="text-amber-200 font-semibold">${client.total}₴</p><p class="text-xs text-neutral-500">${client.visits} визит${client.visits % 10 === 1 ? '' : 'ів'}</p></div></div>
+        </div>
+      `).join('');
+    }
+
+    function renderCurrentView() {
+      if (currentRole === 'client') {
+        renderServicesDropdown();
+        renderClientBookings();
+        const selectedDate = document.getElementById('booking-date').value;
+        if (selectedDate) generateTimeSlots(selectedDate);
+      } else {
+        renderServicesList();
+        renderBlocksList();
+        renderTodayBookings();
+        renderAllBookings();
+        renderClientsList();
+      }
+    }
+
+    function initializeUser() {
+      currentUser = getCurrentUser();
+      const userDisplay = document.getElementById('user-display');
+      const roleIndicator = document.getElementById('role-indicator');
+      if (currentUser) {
+        userDisplay.textContent = `👤 ${currentUser.firstName}`;
+        if (isUserAdmin(currentUser.id)) {
+          currentRole = 'barber';
+          roleIndicator.textContent = '💈 Барбер';
+          roleIndicator.classList.add('border-amber-600', 'text-amber-200');
+          document.getElementById('client-view').classList.add('hidden');
+          document.getElementById('barber-view').classList.remove('hidden');
+        } else {
+          currentRole = 'client';
+          roleIndicator.textContent = '👤 Клієнт';
+          document.getElementById('client-name').value = currentUser.firstName;
+        }
+      } else {
+        userDisplay.textContent = '👤 Гість';
+        roleIndicator.textContent = '👤 Клієнт';
+      }
+    }
+
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tab = btn.dataset.tab;
+        const parent = btn.closest('nav');
+        parent.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        if (currentRole === 'client') {
+          document.getElementById('booking-tab').classList.toggle('hidden', tab !== 'booking');
+          document.getElementById('my-bookings-tab').classList.toggle('hidden', tab !== 'my-bookings');
+          if (tab === 'my-bookings') renderClientBookings();
+        } else {
+          document.getElementById('today-tab').classList.toggle('hidden', tab !== 'today');
+          document.getElementById('all-tab').classList.toggle('hidden', tab !== 'all');
+          document.getElementById('clients-tab').classList.toggle('hidden', tab !== 'clients');
+          document.getElementById('settings-tab').classList.toggle('hidden', tab !== 'settings');
+        }
+      });
+    });
+
+    document.getElementById('add-service-btn').addEventListener('click', () => {
+      document.getElementById('service-name-input').value = '';
+      document.getElementById('service-price-input').value = '';
+      document.getElementById('service-duration-input').value = '30';
+      document.getElementById('service-modal').classList.add('active');
+    });
+    document.getElementById('service-cancel-btn').addEventListener('click', () => {
+      document.getElementById('service-modal').classList.remove('active');
+    });
+    document.getElementById('service-save-btn').addEventListener('click', async () => {
+      const name = document.getElementById('service-name-input').value.trim();
+      const price = parseInt(document.getElementById('service-price-input').value);
+      const duration = parseInt(document.getElementById('service-duration-input').value);
+      if (!name || !price || !duration) {
+        showToast('Заповніть усі поля', 'error');
+        return;
+      }
+      const serviceData = { type: 'service', serviceName: name, servicePrice: price, serviceDuration: duration, serviceActive: true, createdAt: new Date().toISOString() };
+      const result = await window.dataSdk.create(serviceData);
+      if (result.isOk) {
+        showToast('Послугу додано');
+        document.getElementById('service-modal').classList.remove('active');
+      } else showToast('Помилка додавання', 'error');
+    });
+
+    document.getElementById('booking-date').addEventListener('change', (e) => {
+      generateTimeSlots(e.target.value);
+      document.getElementById('selected-time').value = '';
+    });
+    document.getElementById('filter-status').addEventListener('change', renderAllBookings);
+    document.getElementById('add-block-btn').addEventListener('click', async () => {
+      const date = document.getElementById('block-date').value;
+      const time = document.getElementById('block-time').value;
+      const reason = document.getElementById('block-reason').value.trim();
+      if (!date || !reason) {
+        showToast('Заповніть дату та причину', 'error');
+        return;
+      }
+      const blockData = { type: 'block', date: date, time: time || null, blockReason: reason, createdAt: new Date().toISOString() };
+      const result = await window.dataSdk.create(blockData);
+      if (result.isOk) {
+        showToast('Час заблоковано');
+        document.getElementById('block-date').value = '';
+        document.getElementById('block-time').value = '';
+        document.getElementById('block-reason').value = '';
+      } else showToast('Помилка блокування', 'error');
+    });
+
+    document.getElementById('booking-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const selectedTime = document.getElementById('selected-time').value;
+      if (!selectedTime) {
+        showToast('Оберіть час', 'warning');
+        return;
+      }
+      if (allBookings.length >= 999) {
+        showToast('Досягнуто ліміт записів', 'error');
+        return;
+      }
+      const submitBtn = document.getElementById('submit-btn');
+      submitBtn.disabled = true;
+      submitBtn.textContent = '⏳ Записуємо...';
+      const bookingData = {
+        type: 'booking',
+        clientName: document.getElementById('client-name').value.trim(),
+        clientPhone: document.getElementById('client-phone').value.trim(),
+        clientTelegramId: currentUser?.id || 'guest',
+        service: document.getElementById('service').value,
+        date: document.getElementById('booking-date').value,
+        time: selectedTime,
+        status: 'confirmed',
+        notes: document.getElementById('notes').value.trim(),
+        createdAt: new Date().toISOString()
+      };
+      const result = await window.dataSdk.create(bookingData);
+      if (result.isOk) {
+        haptic('light');
+        showToast('Успішно записано! ✨');
+        document.getElementById('service').value = '';
+        document.getElementById('notes').value = '';
+        document.getElementById('selected-time').value = '';
+        document.querySelectorAll('.time-slot').forEach(s => s.classList.remove('selected'));
+        generateTimeSlots(bookingData.date);
+      } else showToast('Помилка запису', 'error');
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Записатись';
+    });
+
+    document.getElementById('service-modal').addEventListener('click', (e) => {
+      if (e.target === e.currentTarget) document.getElementById('service-modal').classList.remove('active');
+    });
+
+    async function init() {
+      const today = getTodayStr();
+      document.getElementById('booking-date').min = today;
+      document.getElementById('booking-date').value = today;
+      document.getElementById('block-date').min = today;
+      if (window.elementSdk) window.elementSdk.init(elementHandler);
+      const dataResult = await window.dataSdk.init(dataHandler);
+      if (!dataResult.isOk) console.error('Data SDK init failed');
+      initializeUser();
+      renderCurrentView();
+    }
+    init();
+  </script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9d9ad0c973ed77b6',t:'MTc3MzA2NzAyNS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
